@@ -106,9 +106,15 @@ sysctl -w net.ipv4.ip_forward=1
 #
 # Activate wireless access point
 #
-hostapd $CONFIG -B
+hostapd $CONFIG &
 
 #
 # Process hostapd events
 #
 hostapd_cli -a $EVENT
+
+#
+# Garbage collection before exit
+#
+echo "Killing hostapd..."
+
