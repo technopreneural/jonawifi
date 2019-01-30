@@ -2,17 +2,26 @@
 #
 # Variables
 #
+CONFDIR="/var/tmp/hostapd"
+CONFIG="${CONFDIR}/hostapd.conf"
+
+USERDIR="/home/pi/jonawifi/ap"
+USERS="${USERDIR}/users.wps"
+
 IFACE="wlan0"
-CFGDIR="/home/pi/jonawifi/ap/"
-CONFIG="${CFGDIR}hostapd.conf"
-WPAPSK="${CFGDIR}hostapd.wpapsk"
+
+#
+# Setup
+#
+mkdir $CONFDIR $USERDIR
+touch $USERS
 
 #
 # Configure wireless access point using hostapd
 #
 cat <<EOF > $CONFIG
 #
-# Wireless interface
+# Wireless interfacee
 #
 interface=${IFACE}
 channel=1
@@ -30,7 +39,7 @@ wpa_key_mgmt=WPA-PSK
 # TKIP, CCMP, CCMP-256
 rsn_pairwise=CCMP
 # MAC address to PSK mappings
-wpa_psk_file=$WPAPSK
+wpa_psk_file=$USERS
 
 #
 # WPS
@@ -51,11 +60,6 @@ serial_number="14344.5254"
 
 # Device type (6-0050F204-1: Access Point)
 device_type=6-0050F204-1
-
-# Radius
-#auth_server_addr=127.0.0.1
-#auth_server_port=1812
-#auth_server_shared_secret=testing123
 
 #
 # Control interface
