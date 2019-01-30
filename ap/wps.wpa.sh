@@ -2,18 +2,18 @@
 #
 # Variables
 #
-CONFDIR="/var/tmp/hostapd"
+CONFDIR="/home/pi/jonawifi/ap"
 CONFIG="${CONFDIR}/hostapd.conf"
+EVENT="${CONFDIR}/event.sh"
 
-USERDIR="/home/pi/jonawifi/ap"
+USERDIR=$CONFDIR
 USERS="${USERDIR}/users.wps"
 
 IFACE="wlan0"
 
 #
-# Setup
+# Wifi userlist (MAC, PSK)
 #
-mkdir $CONFDIR $USERDIR
 touch $USERS
 
 #
@@ -32,13 +32,9 @@ ssid=wpa-psk
 # 1: open system, 2: pre-shared key
 auth_algs=2
 
-# 1: wpa, 2: wpa2/wpa3, 3: both
 wpa=2
-# WPA-PSK, WPA-EAP, WPA-PSK-SHA256, WPA-EAP-SHA256
 wpa_key_mgmt=WPA-PSK
-# TKIP, CCMP, CCMP-256
 rsn_pairwise=CCMP
-# MAC address to PSK mappings
 wpa_psk_file=$USERS
 
 #
@@ -77,26 +73,6 @@ logger_stdout_level=0
 EOF
 
 #
-# Reset wireless interface
-#
-ip link set ${IFACE} down
-ip addr flush dev ${IFACE}
-#sleep 1
-
-#
-# Configure wireless interface
-#
-
-ip link set ${IFACE} up
-ip addr add 192.168.253.1/24 dev ${IFACE}
-#sleep 3
-
-#
-# Enable IP forwarding
-#
-sysctl -w net.ipv4.ip_forward=1
-
-#
 # Configure DHCP using dnsmasq
 #
 cat <<EOT > /etc/dnsmasq.conf
@@ -107,14 +83,32 @@ EOT
 #
 # Apply DHCP configuration
 #
-sudo service dnsmasq restart
+service dnsmasq restart
+
+#
+# Reset wireless interface
+#
+ip link set ${IFACE} down
+ip addr flush dev ${IFACE}
+
+#
+# Configure wireless interface
+#
+
+ip link set ${IFACE} up
+ip addr add 192.168.253.1/24 dev ${IFACE}
+
+#
+# Enable IP forwarding
+#
+sysctl -w net.ipv4.ip_forward=1
 
 #
 # Activate wireless access point
 #
-hostapd $CONFIG
+hostapd $CONFIG -B
 
 #
-# Reset and flush DHCP
+# Process hostapd events
 #
-#sudo service dnsmasq restart
+hostapd_cli -a $EVENT
