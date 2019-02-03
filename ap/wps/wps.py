@@ -9,8 +9,8 @@ import time
 #
 # Constants
 #
-AP_CONFIG = "/home/pi/jonawifi/ap/wps.wpa2-psk.conf"
-AP_EVENTS = "/home/pi/jonawifi/ap/event.sh"
+AP_CONFIG = "/home/pi/jonawifi/ap/wps.conf"
+AP_EVENTS = "/home/pi/jonawifi/ap/events.py"
 
 IFACE = "wlan0"
 IPADDR = "192.168.253.1/24"
@@ -18,8 +18,8 @@ IPADDR = "192.168.253.1/24"
 def dhcp_service_reset():
 	print("Resetting DHCP service...")
 	f=open("/etc/dnsmasq.conf","w+")
-	f.write("interface=%s" % IFACE)
-	f.write("dhcp_range=192.168.253.2,192.168.253.254,1h\r\n")
+	f.write("interface=%s\r\n" % IFACE)
+	f.write("dhcp-range=192.168.253.2,192.168.253.254,1h\r\n")
 	subprocess.call('service dnsmasq restart'.split())
 	print("DHCP Service reset.")
 
@@ -37,7 +37,7 @@ def ap_activate():
 	interface_wireless_reset()
 	subprocess.call(['hostapd','-B',AP_CONFIG])
 	time.sleep(1)
-	subprocess.call(['hostapd_cli','-a',AP_EVENTS])
+	subprocess.call(['hostapd_cli','-B','-a',AP_EVENTS])
 	print("Access point activated.")
 
 def ap_deactivate():
