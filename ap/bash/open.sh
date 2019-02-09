@@ -3,8 +3,8 @@
 # Variables
 #
 IFACE="wlan0"
-CFGDIR="/home/pi/jonawifi/ap/"
-CONFIG="${CFGDIR}hostapd.conf"
+CFGDIR="/home/pi/jonawifi/ap/bash"
+CONFIG="${CFGDIR}/hostapd.conf"
 
 #
 # Configure wireless access point using hostapd
@@ -61,15 +61,15 @@ sysctl -w net.ipv4.ip_forward=1
 #
 # Configure DHCP using dnsmasq
 #
-cat <<EOT > /etc/dnsmasq.conf
-interface=${IFACE}
-dhcp-range=192.168.253.201,192.168.253.220,1h
+#cat <<EOT > /etc/dnsmasq.conf
+#interface=${IFACE}
+#dhcp-range=192.168.253.201,192.168.253.220,1h
 EOT
 
 #
 # Apply DHCP configuration
 #
-sudo service dnsmasq restart
+#sudo service dnsmasq restart
 
 #
 # Activate wireless access point

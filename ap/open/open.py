@@ -19,10 +19,11 @@ IPADDR = "192.168.253.1/24"
 
 def dhcp_service_reset():
 	print("Resetting DHCP service...")
-	f=open("/etc/dnsmasq.conf","w+")
+	f=open("/etc/dnsmasq.d/hostapd","w+")
 	f.write("interface=%s\r\n" % IFACE)
 	f.write("dhcp-authoritative\r\n")
 	f.write("dhcp-range=192.168.253.2,192.168.253.254,1h\r\n")
+	f.close();
 	subprocess.call('service dnsmasq restart'.split())
 	print("DHCP Service reset.")
 
