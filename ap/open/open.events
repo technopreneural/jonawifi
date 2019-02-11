@@ -1,45 +1,111 @@
 #!/usr/bin/python3
 
+import os
 import sys
-import json
+import sqlite3
+import subprocess
 
-IFACE = sys.argv[1]
-EVENT = sys.argv[2]
+def db_path():
+	DB_PATH = os.path.dirname(os.path.abspath(__file__))
+	DB_FILE = DB_PATH + "/open.db"
+	return DB_FILE
 
-print(EVENT)
+def db_connect():
+	try:
+		conn = sqlite3.connect(db_path())
+		return conn
+	except Error as e:
+		print(e)
 
-def on_wps_pbc_active():
-	print("WPS-PBC activated")
+def db_execute(query,input=None):
+	conn = db_connect()
+	cur = conn.cursor()
+	if input == None :
+		cur.execute(query)
+	else:
+		cur.execute(query,input)
+	conn.commit()
+	results = cur.fetchall()
+	conn.close()
+	return results
 
-def on_wps_pbc_disable():
-	print("WPS-PBC cancelled")
+def is_new(macaddr):
+	SQL = """
+		SELECT macaddr
+		FROM devices
+		WHERE macaddr = ?
+	"""
+	rows = db_execute(SQL,"".join(macaddr.split(':')))
+	if len(rows) > 0:
+		return 0
+	else:
+		device_add(macaddr)
+		return 1
 
-def on_wps_timeout():
-	print("WPS timed out")
+def has_lease(macaddr):
+	DHCP_LEASE_FILE = "/var/lib/misc/dnsmasq.lease"
+	cmd = subprocess.Popen(['grep',macaddr,DHCP_LEASE_FILE],shell=False)
+	result = cmd.communicate()
+	if result:
+		return 1
+	else:
+		return 0
 
-def on_wps_reg_success():
-	MACADDR = sys.argv[3]
-	print("New station %s registered successfully" % MACADDR)
+def has_credits(macaddr):
+	SQL = """
+		SELECT macaddr,credits
+		FROM devices
+		WHERE macaddr = ?
+		AND credits > 0
+	"""
+	result = db_execute(SQL,macaddr)
+	if result:
+		return 1
+	else:
+		return 0
 
+def connection_log(event):
+	SQL = """
+		INSERT INTO
+		connection_log(macaddr,status)
+		VALUES(?,?)
+	"""
+	db_execute(SQL,event)
+
+def event_info(event):
+	macaddr = sys.argv[3]
+	status = event + is_new(macaddr) + has_lease(macaddr) + has_credit(macaddr)
+	return (macaddr,status)
+
+#
+# Hostapd event handlers
+#
 def on_ap_sta_connected():
-	MACADDR = sys.argv[3]
-	print("Station %s connected" % MACADDR)
+	if len(sys.argv) >= 4:
+		connection_log(event_info(1))
+		print("Station %s connected" % macaddr)
 
 def on_ap_sta_disconnected():
-	MACADDR = sys.argv[3]
-	print("Station %s disconnected" % MACADDR)
+	if len(sys.argv) >= 4:
+		connection_log(event_info(0))
+		print("Station %s disconnected" % macaddr)
 
 def indirect(i):
 	switcher={
-		'WPS-PBC-ACTIVE':on_wps_pbc_active,
-		'WPS-PBC-DISABLE':on_wps_pbc_disable,
-		'WPS-TIMEOUT':on_wps_timeout,
-		'WPS-REG-SUCCESS':on_wps_reg_success,
 		'AP-STA-CONNECTED':on_ap_sta_connected,
 		'AP-STA-DISCONNECTED':on_ap_sta_disconnected,
 		}
 	func=switcher.get(i,lambda :'invalid')
 	return func()
 
-indirect(EVENT)
+#
+# Main
+#
+if __name__ == '__main__':
+	print(os.system('ps -p %i -o comm=' % os.getppid()))
+
+	num_args = len(sys.argv)
+	if num_args >= 3:
+		EVENT = sys.argv[2]
+		indirect(EVENT)
 

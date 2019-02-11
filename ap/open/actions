@@ -1,0 +1,148 @@
+#!/usr/bin/python3
+
+#
+# Imports
+#
+import os
+import sys
+import sqlite3
+
+from subprocess import Popen,PIPE
+
+#
+# Database functions
+#
+def db_path():
+	DB_PATH = os.path.dirname(os.path.abspath(__file__))
+	DB_FILE = DB_PATH + "/open.db"
+	return DB_FILE
+
+def db_connect():
+	try:
+		conn = sqlite3.connect(db_path())
+		return conn
+	except Error as e:
+		print(e)
+
+def db_execute(query,input=None):
+	conn = db_connect()
+	cur = conn.cursor()
+	cur.execute(query,input)
+	conn.commit()
+	results = cur.fetchall()
+	conn.close()
+	return results
+
+#
+# Utility functions
+#
+def device_add(macaddr):
+	SQL = """
+		INSERT INTO
+		devices(macaddr,credits)
+		VALUES(?,?)
+	"""
+	db_execute(SQL,(macaddr,0))
+
+def is_registered(macaddr):
+	SQL = """
+		SELECT macaddr
+		FROM devices
+		WHERE macaddr = ?
+	"""
+	rows = db_execute(SQL,(macaddr,))
+	if len(rows) > 0:
+		return 1 << 1
+	else:
+		device_add(macaddr)
+		return 0
+
+def has_lease(macaddr): 
+	DHCP_LEASE_FILE = "/var/lib/misc/dnsmasq.leases"
+	cmd = Popen(
+		("grep %s %s" %(macaddr,DHCP_LEASE_FILE)).split(),
+		shell=False,
+		stdout=PIPE,
+	)
+	result = cmd.stdout.readline()
+	if len(result) > 0:
+		return 1 << 2
+	else:
+		return 0
+
+def has_credits(macaddr):
+	SQL = """
+		SELECT credits
+		FROM devices
+		WHERE macaddr = ?
+		AND credits > 0
+	"""
+	rows = db_execute(SQL,(macaddr,))
+	if len(rows) > 0:
+		credits, = rows[0]
+		print("credits:",credits);
+		return 1 << 3
+	else:
+		print("credits:",0)
+		return 0
+
+def ap_log(macaddr,status):
+	status += is_registered(macaddr)
+	status += has_lease(macaddr)
+	status += has_credits(macaddr)
+	SQL = """
+		INSERT INTO
+		connection_log(macaddr,status)
+		VALUES(?,?)
+	"""
+	db_execute(SQL,(macaddr,status,))
+
+#
+# Event actions
+#
+def on_ap_sta_connected():
+	if len(sys.argv) < 4:
+		print("Missing information: MAC address")
+		exit(-1)
+	macaddr = sys.argv[3]
+	ap_log(macaddr,1)
+	print("Station connected:",macaddr)
+
+def on_ap_sta_disconnected():
+	if len(sys.argv) < 4:
+		print("Missing information: MAC address")
+		exit(-1)
+	macaddr = sys.argv[3]
+	ap_log(macaddr,0)
+	print("Station disconnected:",macaddr)
+
+def switch(event):
+	switcher = {
+		'AP-STA-CONNECTED':on_ap_sta_connected,
+		'AP-STA-DISCONNECTED':on_ap_sta_disconnected,
+	}
+	func = switcher.get(event,lambda :'invalid')
+	return func()
+
+#
+# Main
+#
+if __name__ != '__main__':
+	exit(-1)
+
+caller = Popen(
+	('ps -p %i -o comm=' % os.getppid()).split(),
+	shell=False,
+	stdout=PIPE,
+)
+caller = caller.stdout.readline().decode().rstrip()
+authorized_callers = ('hostapd_cli')
+
+if caller not in authorized_callers:
+	print("The HostAPD Event Processor was called by",caller)
+#	exit(-1)
+
+num_args = len(sys.argv)
+if num_args >= 3:
+	event = sys.argv[2]
+	switch(event)

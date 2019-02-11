@@ -1,0 +1,100 @@
+#!/usr/bin/python3
+
+#
+# Imports
+#
+import os
+import sys
+import time
+
+from subprocess import Popen,STDOUT,PIPE
+
+#
+# Constants
+#
+AP_PATH = os.path.dirname(os.path.abspath(__file__))
+AP_CONFIG = AP_PATH + "/open.conf"
+AP_ACTIONS = AP_PATH + "/actions"
+
+IFACE = sys.argv[1] if len(sys.argv) > 1 else "wlan0"
+IPADDR = "192.168.253.1/24"
+
+#
+# Fuctions
+#
+def dhcp_reset():
+	print("DHCP Service resetting...")
+
+	# Generate DHCP configuration file
+	f=open("/etc/dnsmasq.d/hostapd","w+")
+	f.write("interface=%s\r\n" % IFACE)
+	f.write("dhcp-authoritative\r\n")
+	f.write("dhcp-range=192.168.253.2,192.168.253.254,1h\r\n")
+	f.close();
+	# Restart DHCP service to reload configuration
+	Popen('service dnsmasq restart'.split(),shell=False)
+
+	print("DHCP Service reset.")
+
+def iface_reset():
+	print("Interface",IFACE,"resetting...")
+
+	# Bringing interface down
+	Popen(('ip link set %s down' % IFACE).split(),shell=False)
+	# Flushing IP address associations
+	Popen(('ip addr flush dev %s' % IFACE).split(),shell=False)
+	# Bringing interface up
+	Popen(('ip link set %s up' % IFACE).split(),shell=False)
+	# Assign a static IP address
+	Popen(('ip addr add %s dev %s' %(IPADDR,IFACE)).split(),shell=False)
+
+	print("Interface",IFACE,"reset.")
+
+def hostapd_launch():
+	print("HostAPD Service launching...")
+
+	# Launch hostapd
+	hostapd = Popen(
+		("hostapd -B %s" %AP_CONFIG).split(),
+		shell=False,
+		stdout=PIPE
+	)
+	# Wait for hostapd to finish loading
+	while True:
+		line = hostapd.stdout.readline().decode()
+		messages = (
+			"AP-ENABLED",
+			"AP-DISABLED",
+		)
+		if any(message in line for message in messages):
+			break;
+
+	print("HostAPD Service launching...")
+
+def hostapd_cli_launch():
+	print("HostAPD Event Processor launching...")
+
+	# Launch hostapd event processor
+	Popen(
+		("hostapd_cli -a %s" %AP_ACTIONS).split(),
+		shell=False,
+	)
+
+	print("HostAPD Event Processor launched.")
+
+def ap_activate():
+	dhcp_reset()
+	iface_reset()
+	hostapd_launch()
+	hostapd_cli_launch()
+
+def ap_deactivate():
+	print("Deactivating Access Point on interface", IFACE)
+
+#
+# Main
+#
+if __name__ != '__main__':
+	exit(-1)
+
+ap_activate()
