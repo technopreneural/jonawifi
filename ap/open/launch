@@ -20,6 +20,11 @@ IFACE = sys.argv[1] if len(sys.argv) > 1 else "wlan0"
 IPADDR = "192.168.253.1/24"
 
 #
+# Globals
+#
+Processes = {}
+
+#
 # Fuctions
 #
 def dhcp_reset():
@@ -54,14 +59,16 @@ def hostapd_launch():
 	print("HostAPD Service launching...")
 
 	# Launch hostapd
-	hostapd = Popen(
-		("hostapd -B %s" %AP_CONFIG).split(),
+	cmd = Popen(
+		("hostapd %s" %AP_CONFIG).split(),
+		stdout=PIPE,
 		shell=False,
-		stdout=PIPE
 	)
+	Processes['hostapd.%s' %(IFACE)] = cmd
 	# Wait for hostapd to finish loading
 	while True:
-		line = hostapd.stdout.readline().decode()
+		line = cmd.stdout.readline().decode().rstrip()
+		print("> \033[1;32;40m" + line + "\033[0m")
 		messages = (
 			"AP-ENABLED",
 			"AP-DISABLED",
@@ -69,27 +76,27 @@ def hostapd_launch():
 		if any(message in line for message in messages):
 			break;
 
-	print("HostAPD Service launching...")
+	print("HostAPD Service launched.")
 
 def hostapd_cli_launch():
 	print("HostAPD Event Processor launching...")
 
 	# Launch hostapd event processor
 	Popen(
-		("hostapd_cli -a %s" %AP_ACTIONS).split(),
-		shell=False,
+		("hostapd_cli -a %s" %AP_ACTIONS).split()
 	)
 
 	print("HostAPD Event Processor launched.")
 
-def ap_activate():
+def ap_start():
+	print("Activating Access Point on interface", IFACE,"...")
+
 	dhcp_reset()
 	iface_reset()
 	hostapd_launch()
 	hostapd_cli_launch()
 
-def ap_deactivate():
-	print("Deactivating Access Point on interface", IFACE)
+	print("Access Point on interface", IFACE,"activated.")
 
 #
 # Main
@@ -97,4 +104,4 @@ def ap_deactivate():
 if __name__ != '__main__':
 	exit(-1)
 
-ap_activate()
+ap_start()
